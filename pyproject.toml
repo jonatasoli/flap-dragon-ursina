@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "ursina-flappy"
+version = "0.1.0"
+description = ""
+authors = ["Jônatas Luiz de Oliveira <contact@jonatasoliveira.dev>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "ursina_flappy"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ursina = "^5.3.0"
+pillow = "^9.5.0"
+
+
+[tool.poetry.group.dev.dependencies]
+blue = "^0.9.1"
+isort = "^5.12.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
