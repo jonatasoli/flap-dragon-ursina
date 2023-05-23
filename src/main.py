@@ -1,110 +1,126 @@
-from PIL import Image, ImageDraw, ImageFont
+from random import randint
+
 from ursina import *
 
-# Cria uma imagem com o símbolo '@'
-image = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
-draw = ImageDraw.Draw(image)
-font = ImageFont.load_default()
-draw.text((16, 16), '@', fill=(255, 255, 0), font=font)
-image.save('player_texture.png')
 
-# Carrega a fonte personalizada
-# Text.default_font =tom_font
-# Text.default_resolution = 10 * Text.size
-
-
-class Player(Entity):
-    def __init__(self):
-        super().__init__(
-            model='quad',
-            texture='player_texture.png',
-            color=color.yellow,
-            origin=(4.0, -0.5),
-            scale=(1, 1),
-        ),
-        self.velocity = 0.0
-        self.acceleration = 0.2
-        self.max_speed = 2.0
-        self.can_move = False
-
-    def update(self):
-        if self.can_move:
-            time.sleep(1)  # Adiciona um atraso de 300 ms (0.3 segundos)
-            # Acelera o jogador no eixo x até o valor máximo
-            if self.velocity < self.max_speed:
-                self.velocity -= self.acceleration
-
-            # Atualiza a posição do jogador no eixo y
-            self.y += self.velocity
-            self.x += -0.3
-            print(self.y)
-
-    def input(self, key):
-        if key == 'space':
-            self.can_move = True
-
-
-def playing():
-    # Cria uma nova cena
-    scene.clear()
-
-    # Adiciona um objeto de fundo azul à cena
-    background = Sky(color=color.blue)
-
-    # Adiciona o jogador à cena
-    player = Player()
-    scene.entities.append(player)
-    print("cena")
-
-
-class PrincipalMenu(Entity):
-    def __init__(self, **kwargs):
+class Pipe(Entity):
+    def __init__(self, x, y):
         super().__init__()
-        # Cria o texto "MAIN MENU"
-        self.main_menu_text = Text(text='MAIN MENU', y=0.4, x=-0.2, scale=2)
+        self.model = 'quad'
+        self.scale = (1, 7)
+        self.color = color.green
+        self.x = x
+        self.y = y
+        self.collider = 'box'
+        self.score_tag = True
 
-        # Cria o texto "PRESS SPACE TO PLAY"
-        self.play_button = Button(
-            text='PRESS SPACE TO PLAY',
-            y=0.2,
-            x=-0.06,
-            scale=(0.3, 0.1),
-            on_click=self.start_game,
-        )
 
-        # Cria o texto "PRESS Q TO QUIT"
-        self.quit_button = Button(
-            text='PRESS Q TO QUIT',
-            y=0.1,
-            x=-0.06,
-            scale=(0.3, 0.1),
-            on_click=self.finalize_exit,
-        )
+def died():
+    Text(
+        text='You dieded! Reload the game!',
+        origin=(0, 0),
+        scale=3,
+        color=color.red,
+    )
 
-    def start_game(self):
-        # Inicia o jogo
-        print('Iniciando o jogo!')
-        playing()
 
-    def finalize_exit(self):
-        # Finaliza o jogo
+# Main code
+app = Ursina()
+
+bird = Entity(
+    collider='box',
+    model='quad',
+    # texture='player_texture.png',
+    color=color.yellow,
+    # scale = (1.3,0.8),
+    # y = 1.5,
+    origin=(4.0, -0.5),
+    scale=(1, 1),
+)
+# Some variables
+offset = 0
+run = True
+n_frame = 0
+num = 5
+x = 6
+score = 0
+run_game = False
+bg = Sky(color=color.blue)
+
+pipes_bottom = [None] * num
+pipes_bottom[0] = Pipe(x, -4)
+
+pipes_top = [None] * num
+pipes_top[0] = Pipe(x, -4 + 9)
+
+for m in range(1, num):
+
+    x += 4
+    y = -7 + randint(0, 50) / 10
+    pipes_bottom[m] = Pipe(x, y)
+    pipes_top[m] = Pipe(x, y + 9)
+
+text = Text(
+    text=f'Score: {score}',
+    position=(-0.65, 0.4),
+    origin=(0, 0),
+    scale=2,
+    color=color.yellow,
+    background=True,
+)
+
+
+def input(key):
+    global run_game
+
+    if key == 'space' and not run_game:
+        run_game = True
+    elif key == 'space' and run_game:
+        bird.y += 0.25
+
+    if key == 'q':
         app.finalizeExit()
 
-    def input(self, key):
-        if key == 'space':
-            self.start_game()
-
-        if key == 'q':
-            self.finalize_exit()
-
-
-app = Ursina(title='Flappy Dragon')
-
-main_menu = PrincipalMenu()
 
 def update():
-    for entity in scene.entities:
-        if isinstance(entity, Player):
-            entity.update()
+    global offset, run_game, n_frame, score, text
+
+    if run_game:
+
+        # Rolling background
+        offset += time.dt * 0.3
+        setattr(bg, 'texture_offset', (offset, 0))
+        bird.y -= time.dt * 0.5
+
+        for m in range(num):
+            pipes_top[m].x -= time.dt * 1.8
+            pipes_bottom[m].x -= time.dt * 1.8
+
+            if pipes_top[m].x < -8:
+                pipes_top[m].x += 4 * num
+                pipes_bottom[m].x += 4 * num
+                pipes_top[m].score_tag = True
+
+            if pipes_top[m].x < bird.x and pipes_top[m].score_tag:
+                score += 1
+                text.y = 1
+                text = Text(
+                    text=f'Score: {score}',
+                    position=(-0.65, 0.4),
+                    origin=(0, 0),
+                    scale=2,
+                    color=color.green,
+                    background=True,
+                )
+                pipes_top[m].score_tag = False
+
+        # Collision
+        hit_info = bird.intersects()
+        if hit_info.hit:
+            run_game = False
+            invoke(Func(bird.shake, duration=2))
+            invoke(Func(bird.fade_out, duration=3))
+            invoke(died, delay=3)
+
 
 app.run()
